@@ -3,7 +3,7 @@ services:
     build: .
     container_name: logops-app
     environment:
-      - APP_VERSION=0.1.0
+      - APP_VERSION=${APP_VERSION:-local}
       - DATABASE_URL=sqlite:////data/logops.db
     volumes:
       - logops_data:/data
