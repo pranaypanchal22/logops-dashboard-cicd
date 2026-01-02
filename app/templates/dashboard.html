@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>LogOps Dashboard <span class="muted">v{{ version }}</span></h1>
+  <p class="muted">Window: last {{ window_minutes }} minutes (since {{ since.isoformat() }})</p>
+
+  <form method="GET" action="/dashboard" class="actions">
+    <div>
+      <label class="muted">Minutes</label><br/>
+      <input name="minutes" type="number" min="1" max="1440" value="{{ window_minutes }}"/>
+    </div>
+    <div>
+      <label class="muted">Level</label><br/>
+      <select name="level">
+        <option value="">All</option>
+        {% for lv in allowed_levels %}
+          <option value="{{ lv }}" {% if filters.level == lv %}selected{% endif %}>{{ lv }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="muted">Service</label><br/>
+      <input name="service" placeholder="auth-api" value="{{ filters.service }}"/>
+    </div>
+    <div>
+      <label class="muted">Search</label><br/>
+      <input name="q" placeholder="message contains..." value="{{ filters.q }}"/>
+    </div>
+    <div>
+      <button type="submit">Apply</button>
+      <a href="/dashboard" style="margin-left:8px;">Reset</a>
+    </div>
+  </form>
+
+  <div class="row" style="margin-top:16px;">
+    <div class="card">
+      <div class="muted">INFO</div>
+      <div style="font-size:28px;">{{ counts.INFO }}</div>
+    </div>
+    <div class="card">
+      <div class="muted">WARN</div>
+      <div style="font-size:28px;">{{ counts.WARN }}</div>
+    </div>
+    <div class="card">
+      <div class="muted">ERROR</div>
+      <div style="font-size:28px;">{{ counts.ERROR }}</div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:20px;">Top services by ERROR</h3>
+  <table>
+    <thead><tr><th>Service</th><th>Error Count</th></tr></thead>
+    <tbody>
+      {% for s, c in top_error_services %}
+        <tr><td>{{ s }}</td><td>{{ c }}</td></tr>
+      {% else %}
+        <tr><td colspan="2" class="muted">No ERROR logs in this window.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:20px;">Recent logs (max 50)</h3>
+  <table>
+    <thead><tr><th>Time (UTC)</th><th>Level</th><th>Service</th><th>Message</th></tr></thead>
+    <tbody>
+      {% for e in recent %}
+        <tr>
+          <td>{{ e.timestamp.isoformat() }}</td>
+          <td><span class="tag {{ e.level }}">{{ e.level }}</span></td>
+          <td>{{ e.service }}</td>
+          <td>{{ e.message }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="muted">No logs found for this filter/window.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
