@@ -6,7 +6,6 @@ pipeline {
   }
 
   environment {
-    // Default values (we’ll overwrite APP_VERSION after checkout)
     APP_VERSION = "local"
     HEALTH_URL  = "http://localhost:8080/health"
   }
@@ -16,13 +15,13 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
-        // Compute short commit hash in a way that always works
         script {
           env.APP_VERSION = sh(script: "git rev-parse --short=7 HEAD", returnStdout: true).trim()
         }
+
         sh '''
           echo "=== Workspace Info ==="
-          pwd
+          echo "PWD: $(pwd)"
           echo "Commit: $(git rev-parse HEAD)"
           echo "APP_VERSION: ${APP_VERSION}"
           echo "=== Files in workspace ==="
@@ -35,8 +34,12 @@ pipeline {
       steps {
         sh '''
           set -e
+          echo "=== Test Stage ==="
+          echo "Host workspace: $(pwd)"
+          echo "Host files:"
+          ls -la
 
-          echo "=== Resolving requirements file ==="
+          # Find requirements (root preferred)
           REQ="requirements.txt"
           if [ ! -f "$REQ" ]; then
             REQ="app/requirements.txt"
@@ -53,11 +56,20 @@ pipeline {
 
           echo "Using requirements: $REQ"
 
+          # Run tests in an isolated Python container
           docker run --rm \
-            -v "$PWD:/workspace" -w /workspace \
+            -v "$(pwd):/workspace" -w /workspace \
             python:3.11-slim bash -lc "
-              python -m pip install --upgrade pip >/dev/null &&
-              pip install -r $REQ &&
+              set -e
+              echo '=== Inside test container ==='
+              echo 'PWD:' && pwd
+              echo 'Listing /workspace:' && ls -la /workspace
+
+              # Ensure requirements exist inside container at the mounted path
+              test -f /workspace/$REQ || (echo 'REQ NOT FOUND inside container: /workspace/'$REQ && exit 1)
+
+              python -m pip install --upgrade pip >/dev/null
+              pip install -r /workspace/$REQ
               pytest -q
             "
         '''
@@ -71,10 +83,13 @@ pipeline {
           echo "=== Build & Deploy ==="
           echo "Deploying APP_VERSION=${APP_VERSION}"
 
-          # Optional: clean up old stack before redeploy (prevents port conflicts)
+          # Avoid port conflicts / stale containers
           docker compose down || true
 
+          # Build + start
           APP_VERSION=${APP_VERSION} docker compose up -d --build
+
+          echo "=== docker compose ps ==="
           docker compose ps
         '''
       }
@@ -97,7 +112,9 @@ pipeline {
           done
 
           echo "Health check failed ❌"
+          echo "=== docker compose ps ==="
           docker compose ps || true
+          echo "=== docker compose logs (tail) ==="
           docker compose logs --no-color --tail 200 || true
           exit 1
         '''
@@ -110,6 +127,12 @@ pipeline {
       sh '''
         echo "=== Post: docker compose ps ==="
         docker compose ps || true
+      '''
+    }
+    failure {
+      sh '''
+        echo "=== Post: docker compose logs (tail) ==="
+        docker compose logs --no-color --tail 200 || true
       '''
     }
   }
