@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    container_name: logops-app
+    #container_name: logops-app
     environment:
       - APP_VERSION=${APP_VERSION:-local}
       - DATABASE_URL=sqlite:////data/logops.db
@@ -12,7 +12,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: logops-nginx
+    #container_name: logops-nginx
     depends_on:
       - app
     ports:
