@@ -1,7 +1,9 @@
 pipeline {
   agent any
 
-  options { timestamps() }
+  options {
+    timestamps()
+  }
 
   environment {
     HEALTH_URL = "http://localhost:8080/health"
@@ -13,7 +15,7 @@ pipeline {
       steps {
         checkout scm
         sh '''
-          echo "=== Workspace ==="
+          echo "Workspace:"
           pwd
           ls -la
         '''
@@ -24,10 +26,12 @@ pipeline {
       steps {
         sh '''
           set -e
-          echo "=== Test (running in Jenkins container) ==="
+          echo "Running tests inside Jenkins container"
+
           python3 --version
           python3 -m venv .venv
           . .venv/bin/activate
+
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pytest -q
@@ -40,7 +44,7 @@ pipeline {
         sh '''
           set -e
           APP_VERSION=$(git rev-parse --short=7 HEAD)
-          echo "APP_VERSION=$APP_VERSION"
+          echo "Deploying version: $APP_VERSION"
 
           docker compose down || true
           APP_VERSION=$APP_VERSION docker compose up -d --build
@@ -53,7 +57,8 @@ pipeline {
       steps {
         sh '''
           set -e
-          echo "Checking ${HEALTH_URL}"
+          echo "Health check: ${HEALTH_URL}"
+
           for i in $(seq 1 30); do
             if curl -fsS "${HEALTH_URL}" > /dev/null; then
               echo "Healthy ✅"
@@ -62,6 +67,7 @@ pipeline {
             echo "Waiting... ($i/30)"
             sleep 2
           done
+
           echo "Health check failed ❌"
           docker compose ps || true
           docker compose logs --no-color --tail 200 || true
